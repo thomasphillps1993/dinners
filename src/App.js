@@ -1,14 +1,25 @@
 import React, { useState, useEffect } from "react";
-import { fetchDinners, addDinner } from './services/dynamodb'; // Import DynamoDB functions
-import { getDinnerSuggestions } from './services/openai'; // Import OpenAI functions
-import 'bootstrap/dist/css/bootstrap.min.css';
+import { fetchDinners, addDinner, deleteDinner } from "./services/dynamodb"; // Import DynamoDB functions
+import { getDinnerSuggestions } from "./services/openai"; // Import OpenAI functions
+import dayjs from 'dayjs'; // Import dayjs
+import customParseFormat from 'dayjs/plugin/customParseFormat'; // Import the custom parse format plugin
 
+dayjs.extend(customParseFormat); // Extend dayjs with the plugin
+
+import "bootstrap/dist/css/bootstrap.min.css";
+
+// Extend Day.js with the customParseFormat plugin
+dayjs.extend(customParseFormat);
 
 function App() {
   const [dinners, setDinners] = useState([]);
   const [showModal, setShowModal] = useState(false);
-  const [currentDinner, setCurrentDinner] = useState(null);
   const [suggestion, setSuggestion] = useState("");
+  const [newDinner, setNewDinner] = useState({
+    name: "",
+    description: "",
+    day: "", // Use day instead of time
+  });
 
   // Fetch dinners from DynamoDB when component loads
   useEffect(() => {
@@ -19,10 +30,21 @@ function App() {
     loadDinners();
   }, []);
 
-  // Handle saving a new dinner to DynamoDB
-  const handleSaveDinner = async (newDinner) => {
+  // Handle form input changes
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setNewDinner((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // Handle saving a new dinner
+  const handleSaveDinner = async () => {
+    if (!newDinner.name || !newDinner.description || !newDinner.day) {
+      alert("Please fill out all fields.");
+      return;
+    }
     await addDinner(newDinner);
     setShowModal(false);
+    setNewDinner({ name: "", description: "", day: "" }); // Reset after save
     const updatedDinners = await fetchDinners();
     setDinners(updatedDinners);
   };
@@ -33,33 +55,119 @@ function App() {
     setSuggestion(aiSuggestion);
   };
 
+  // Handle deleting a dinner
+  const handleDeleteDinner = async (pk, sk) => {
+    await deleteDinner(pk, sk);
+    const updatedDinners = await fetchDinners();
+    setDinners(updatedDinners);
+  };
+
   return (
-    <div>
-      <button onClick={handleGetSuggestions}>Get AI Dinner Suggestions</button>
-      {suggestion && <p>{suggestion}</p>}
+    <div className="container mt-4">
+      <div className="text-center mb-4">
+        <h1>Dinners</h1>
+        <button className="btn btn-primary" onClick={handleGetSuggestions}>
+          Get AI Dinner Suggestions
+        </button>
+        {suggestion && <p className="mt-3">{suggestion}</p>}
+      </div>
 
-      <h1>Dinners</h1>
-      <button onClick={() => setShowModal(true)}>Add Dinner</button>
-      
-      {dinners.length > 0 ? (
-        <ul>
-          {dinners.map((dinner) => (
-            <li key={dinner.pk}>
-              {dinner.sk} - {dinner.description} at {dinner.time}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p>No dinners scheduled.</p>
-      )}
+      <div>
+        {dinners.length > 0 ? (
+          <ul className="list-group">
+            {dinners.map((dinner) => {
+              // Parse and format the time to display the day of the week
+              const formattedDay = dayjs(dinner.day, 'YYYY-MM-DD').format('dddd'); // Get the day from 'day' field
 
+              return (
+                <li key={dinner.pk} className="list-group-item">
+                  {/* Display the selected day correctly */}
+                  <strong>{formattedDay}</strong>: {dinner.description} - {dinner.sk}
+
+                  {/* Delete button */}
+                  <button
+                    className="btn btn-danger btn-sm float-end ms-2"
+                    onClick={() => handleDeleteDinner(dinner.pk, dinner.sk)} // Ensure both pk and sk are passed
+                  >
+                    Delete
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p>No dinners scheduled.</p>
+        )}
+      </div>
+
+      <div className="text-center mt-4">
+        <button className="btn btn-success" onClick={() => setShowModal(true)}>
+          Add Dinner
+        </button>
+      </div>
+
+      {/* Modal for adding a new dinner */}
       {showModal && (
-        <div>
-          <h2>Add Dinner</h2>
-          {/* Add your form for adding a new dinner here */}
-          <button onClick={() => handleSaveDinner({ name: "Spaghetti", description: "Pasta with tomato sauce", time: "7:00 PM" })}>
-            Save
-          </button>
+        <div
+          className="modal show"
+          style={{ display: "block" }}
+          onClick={() => setShowModal(false)}
+        >
+          <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Add Dinner</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowModal(false)}
+                ></button>
+              </div>
+              <div className="modal-body">
+                {/* Updated form to capture real values */}
+                <form>
+                  <div className="mb-3">
+                    <label className="form-label">Dinner Name</label>
+                    <input
+                      type="text"
+                      name="name"
+                      className="form-control"
+                      placeholder="Enter dinner name"
+                      value={newDinner.name}
+                      onChange={handleChange}
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Dinner Description</label>
+                    <textarea
+                      name="description"
+                      className="form-control"
+                      placeholder="Enter dinner description"
+                      value={newDinner.description}
+                      onChange={handleChange}
+                    ></textarea>
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Dinner Day</label>
+                    <input
+                      type="date"
+                      name="day"
+                      className="form-control"
+                      value={newDinner.day}
+                      onChange={handleChange}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleSaveDinner}
+                  >
+                    Save
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
