@@ -1,15 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { fetchDinners, addDinner, deleteDinner } from "./services/dynamodb"; // Import DynamoDB functions
 import { getDinnerSuggestions } from "./services/openai"; // Import OpenAI functions
-import dayjs from 'dayjs'; // Import dayjs
-import customParseFormat from 'dayjs/plugin/customParseFormat'; // Import the custom parse format plugin
-
-dayjs.extend(customParseFormat); // Extend dayjs with the plugin
-
 import "bootstrap/dist/css/bootstrap.min.css";
-
-// Extend Day.js with the customParseFormat plugin
-dayjs.extend(customParseFormat);
 
 function App() {
   const [dinners, setDinners] = useState([]);
@@ -75,25 +67,20 @@ function App() {
       <div>
         {dinners.length > 0 ? (
           <ul className="list-group">
-            {dinners.map((dinner) => {
-              // Parse and format the time to display the day of the week
-              const formattedDay = dayjs(dinner.day, 'YYYY-MM-DD').format('dddd'); // Get the day from 'day' field
-
-              return (
-                <li key={dinner.pk} className="list-group-item">
-                  {/* Display the selected day correctly */}
-                  <strong>{formattedDay}</strong>: {dinner.description} - {dinner.sk}
-
-                  {/* Delete button */}
-                  <button
-                    className="btn btn-danger btn-sm float-end ms-2"
-                    onClick={() => handleDeleteDinner(dinner.pk, dinner.sk)} // Ensure both pk and sk are passed
-                  >
-                    Delete
-                  </button>
-                </li>
-              );
-            })}
+            {dinners.map((dinner) => (
+              <li key={dinner.pk} className="list-group-item">
+                {/* Display the selected day correctly */}
+                <strong>{dinner.time}</strong>: {dinner.description} - {dinner.sk}
+                
+                {/* Delete button */}
+                <button
+                  className="btn btn-danger btn-sm float-end ms-2"
+                  onClick={() => handleDeleteDinner(dinner.pk, dinner.sk)}  // Ensure both pk and sk are passed
+                >
+                  Delete
+                </button>
+              </li>
+            ))}
           </ul>
         ) : (
           <p>No dinners scheduled.</p>
